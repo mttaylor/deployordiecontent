@@ -1,0 +1,56 @@
+name: Release Notes Generator
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  generate-release-notes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit log since last tag
+        id: commits
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s" | head -50)
+          echo "COMMITS<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes with Claude
+        id: notes
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d '{
+              "model": "claude-opus-4-5",
+              "max_tokens": 500,
+              "messages": [{
+                "role": "user",
+                "content": "Summarize these commits into release notes for '"${{ github.ref_name }}"'. Group by feature, bugfix, and breaking change. Write for developers. No marketing language. Under 200 words.\n\nCommits:\n'"${{ steps.commits.outputs.COMMITS }}"'"
+              }]
+            }')
+          NOTES=$(echo $RESPONSE | jq -r '.content[0].text')
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.NOTES }}
