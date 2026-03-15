@@ -11,6 +11,7 @@ Straight talk for engineers who want more.
 | Episode | Topic | Folder |
 |---------|-------|--------|
 | EP001 | Automated Release Notes with Claude AI | [ep001-release-notes-automation](./ep001-release-notes-automation/) |
+| EP002 | Free Prediction Market Data with the Polymarket API | [ep002-polymarket-signal](./ep002-polymarket-signal/) |
 
 ---
 
