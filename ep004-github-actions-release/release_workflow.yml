@@ -1,0 +1,36 @@
+name: Release Automation
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Release Notes
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          pip install anthropic -q
+          python scripts/generate_notes.py > release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          name: ${{ github.ref_name }}
+          make_latest: true
+
+      - name: Notify Slack
+        run: |
+          curl -s -X POST ${{ secrets.SLACK_WEBHOOK }} \
+            -H 'Content-type: application/json' \
+            -d "{\"text\": \"Released ${{ github.ref_name }} — see GitHub for notes.\"}"
